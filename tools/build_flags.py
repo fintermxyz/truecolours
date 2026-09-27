@@ -167,6 +167,35 @@ def apply_groups(labels, idx, palette, groups, threshold):
     for g in groups:
         want = np.array(b_hex(g["hex"]))
         ci = int(((palette - want) ** 2).sum(axis=1).argmin())
+        if g.get("rect"):
+            # pixel-rectangle selection: picks pixels of this colour inside the given
+            # boxes regardless of which connected piece they belong to - the only way to
+            # carve a shape (e.g. trousers) out of a blob that's fused to its neighbour
+            # with no colour boundary between them at all.
+            mask = idx == ci
+            rect_mask = np.zeros(idx.shape, dtype=bool)
+            for x0, y0, x1, y1 in g["rect"]:
+                rect_mask[int(y0 * H):int(y1 * H), int(x0 * W):int(x1 * W)] = True
+            mask &= rect_mask
+            if not mask.any():
+                print("   (rect group matched nothing:", g, ")"); continue
+            into = g.get("into")
+            if into is None:
+                labels[mask] = int(labels.max()) + 1
+            elif into == "prefill":
+                labels[mask] = 0
+            elif into == "nearest":
+                same = (labels > 0) & (idx == ci) & ~mask
+                if same.any():
+                    _, (iy, ix) = ndimage.distance_transform_edt(~same, return_indices=True)
+                    ys, xs = np.nonzero(mask)
+                    labels[ys, xs] = labels[iy[ys, xs], ix[ys, xs]]
+            else:
+                target = labels[int(into[1] * H), int(into[0] * W)]
+                if target == 0:
+                    print("   (group target point is not on a fillable region:", g, ")"); continue
+                labels[mask] = target
+            continue
         lab, n = ndimage.label(idx == ci)
         sizes = ndimage.sum(idx == ci, lab, index=np.arange(1, n + 1))
         objs = ndimage.find_objects(lab)
@@ -201,6 +230,8 @@ def apply_groups(labels, idx, palette, groups, threshold):
         if into is None:
             new_id = int(labels.max()) + 1
             for r in chosen: labels[lab == r] = new_id
+        elif into == "prefill":
+            for r in chosen: labels[lab == r] = 0
         elif into == "nearest":
             same = (labels > 0) & (idx == ci)
             for r in chosen: same &= ~(lab == r)

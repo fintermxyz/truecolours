@@ -85,16 +85,29 @@ THRESHOLDS = {
 # Each entry selects pixels of one colour and makes them behave as ONE region.
 #   hex     colour to select (nearest colour in the flag's palette is used)
 #   select  (optional filters, combined)
-#     boxes   [(x0, y0, x1, y1), ...]  only pieces lying inside one of these boxes
+#     boxes   [(x0, y0, x1, y1), ...]  only pieces WHOLLY inside one of these boxes
 #                                      (fractions of the flag width / height)
 #     points  [(x, y), ...]            only the pieces containing these points
 #     minor   True                     only pieces under PREFILL_THRESHOLD
 #     major   True                     only pieces of at least PREFILL_THRESHOLD
 #     small   True                     only pieces that are currently pre-filled
+#     rect    [(x0, y0, x1, y1), ...]  pixels of this colour inside these boxes,
+#                                      regardless of which connected piece they
+#                                      belong to - use this (instead of boxes/points)
+#                                      when the thing you want has no colour
+#                                      boundary from its neighbour at all (e.g. a
+#                                      figure's trousers drawn as a gap in the
+#                                      outline, left as the same fill as the
+#                                      background behind it) so per-piece selection
+#                                      can't isolate it. Skips boxes/points/minor/
+#                                      major/small - it's a separate, simpler path.
 #   into    where the selected pixels go:
 #     absent      -> they become one new fillable region (merged together)
 #     (x, y)      -> they join the fillable region that contains this point
 #     "nearest"   -> each piece joins the nearest fillable region of the same colour
+#     "prefill"   -> they become pre-filled (removed from play) - for turning a
+#                    region that is currently fillable (or a small piece that would
+#                    otherwise qualify) into fixed detail
 # Typical uses: stripes of one colour fill together; stars fill together; an
 # emblem drawn with black linework fills as one piece; a pre-filled sliver that
 # gives a background colour away is absorbed into that background.
@@ -145,8 +158,9 @@ GROUPS = {
     "ws": [dict(hex="#ffffff")],
     # Ghana: the yellow sliver by the star belongs to the middle stripe
     "gh": [dict(hex="#fcd116")],
-    # Israel: everything inside the star is background
-    "il": [dict(hex="#ffffff")],
+    # Israel: only the bits inside/around the star join the centre background -
+    # the top and bottom white margins stay their own fillable regions
+    "il": [dict(hex="#ffffff", boxes=[(0.0, 0.15, 1.0, 0.85)])],
     # Taiwan: sun rays and disc are one piece
     "tw": [dict(hex="#ffffff")],
     # Cyprus: olive branches are one piece
@@ -157,4 +171,38 @@ GROUPS = {
     "et": [dict(hex="#ffc621")],
     # Brunei: emblem yellow joins the lower yellow band; emblem red is one piece
     "bn": [dict(hex="#f7e017", minor=True, into=(0.37, 0.84)), dict(hex="#cf1126")],
+    # Moldova: the eagle (all brown) is one piece; the olive branch in its talon
+    # (green, plus its darker shading) is a separate single piece
+    "md": [dict(hex="#a77b3b"), dict(hex="#008f00"), dict(hex="#008500", into=(0.273, 0.479))],
+    # Belize: the wreath's leaves (both greens used around the ring and in the
+    # tree) fill together; the grass tufts under the men's feet (same green as
+    # the tree) are pre-filled instead of playable; each man's trousers are drawn
+    # as a gap in the outline with no colour boundary from the background behind
+    # them, so they're carved out by position and pre-filled
+    "bz": [
+        dict(hex="#289400", boxes=[(0.30, 0.15, 0.70, 0.42)]),
+        dict(hex="#289400", boxes=[(0.25, 0.55, 0.75, 0.75)], into="prefill"),
+        dict(hex="#ffffff", rect=[(0.3225, 0.43, 0.425, 0.64), (0.58125, 0.43, 0.68125, 0.64)], into="prefill"),
+    ],
+    # Tuvalu: the nine stars fill together
+    "tv": [dict(hex="#fff40d")],
+    # Bhutan: the whole orange half and the whole yellow half are each a single
+    # piece - no sliver of either colour is cut off and pre-filled by the dragon
+    "bt": [dict(hex="#ffd520"), dict(hex="#ff4e12")],
+    # Comoros: the four stars fill together (the crescent and the white stripe
+    # stay as they are)
+    "km": [dict(hex="#ffffff", points=[(0.2125, 0.343), (0.2125, 0.445), (0.2125, 0.547), (0.2125, 0.65)])],
+    # Papua New Guinea: the red bird-of-paradise background is one piece (no
+    # pre-filled sliver); all five Southern Cross stars fill together
+    "pg": [dict(hex="#ff0000"), dict(hex="#ffffff")],
+    # Iran: the whole national emblem (the two side crescents and the small
+    # flourish above, as well as the central sword shape) is one piece - the
+    # background red stripe is untouched
+    "ir": [dict(hex="#da0000", boxes=[(0.35, 0.30, 0.65, 0.70)])],
+    # China: all five stars fill together
+    "cn": [dict(hex="#ffff00")],
+    # Saudi Arabia: the shahada text and sword are one white piece; the green
+    # background (including any sliver the script would otherwise cut off) is
+    # the other - two regions total, no pre-fill
+    "sa": [dict(hex="#165d31"), dict(hex="#ffffff")],
 }
