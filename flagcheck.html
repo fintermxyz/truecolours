@@ -26,7 +26,33 @@
     #fc-fine.is-done { background: linear-gradient(135deg, #2ee6c5, #1fb894); color: #06231d; box-shadow: 0 8px 24px rgba(46, 230, 197, .3); }
     .fc-score { margin-top: 16px; }
     .fc-score-total { font: 800 34px var(--display); text-align: center; margin-bottom: 10px; }
-    .fc-footer { text-align: center; padding: 10px 20px 40px; }
+    .fc-footer { text-align: center; padding: 10px 20px 40px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: center; }
+
+    .fc-grid {
+      display: grid; grid-template-columns: 200px minmax(0, 1fr) 340px; gap: 28px;
+      max-width: 1180px; margin: 0 auto; padding: 8px 20px 40px; align-items: start;
+    }
+    .fc-truth-col { position: sticky; top: 16px; }
+    .fc-truth-label {
+      text-align: center; color: var(--muted); font: 700 12px var(--body); letter-spacing: .12em;
+      text-transform: uppercase; margin: 0 0 10px;
+    }
+    .fc-truth-frame { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); background: var(--panel); aspect-ratio: 4 / 3; }
+    .fc-truth-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .fc-notes { margin-top: 18px; }
+    .fc-notes label { display: block; color: var(--muted); font: 700 12px var(--body); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+    .fc-notes textarea {
+      width: 100%; min-height: 90px; resize: vertical; font: 500 14px/1.5 var(--body); color: var(--text);
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    }
+    .fc-notes textarea:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
+    .fc-notes-status { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 15px; }
+
+    @media (max-width: 860px) {
+      .fc-grid { grid-template-columns: 1fr; gap: 18px; }
+      .fc-truth-col { position: static; max-width: 130px; margin: 0 auto; }
+    }
     @media (max-width: 720px) {
       .fc-jump select { max-width: 60vw; }
     }
@@ -48,7 +74,14 @@
       </div>
     </div>
 
-    <div class="play-grid">
+    <div class="fc-grid">
+      <div class="fc-truth-col">
+        <p class="fc-truth-label">Ground truth</p>
+        <div class="fc-truth-frame">
+          <img id="fc-truth-img" alt="Real flag">
+        </div>
+      </div>
+
       <div class="flag-col">
         <h2 class="country-name" id="fc-country">COUNTRY</h2>
         <div class="flag-frame">
@@ -62,6 +95,11 @@
         <div class="progress-row">
           <div class="progress-text" id="progress-text">0 of 0 regions filled</div>
           <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+        <div class="fc-notes">
+          <label for="fc-notes-input">Notes for this flag</label>
+          <textarea id="fc-notes-input" rows="4" placeholder="Anything to fix here - regions to merge/split, pre-fill issues, etc."></textarea>
+          <div class="fc-notes-status" id="fc-notes-status"></div>
         </div>
       </div>
 
@@ -80,6 +118,7 @@
     </div>
 
     <div class="fc-footer">
+      <button class="link-btn" id="fc-copy-notes">Copy all notes to clipboard</button>
       <button class="link-btn" id="fc-reset">Reset all "fine" marks</button>
     </div>
   </section>

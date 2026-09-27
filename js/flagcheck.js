@@ -1,7 +1,8 @@
 /* flagcheck.js - a dev-only tool for playing through every flag in the game,
    one after another, to check regions/pre-fill behave correctly. Not linked
-   from the game itself; open flagcheck.html directly. Progress ("fine" marks)
-   is kept in this browser's localStorage only. */
+   from the game itself; open flagcheck.html directly. Progress ("fine" marks
+   and free-text notes per flag) is kept in this browser's localStorage only -
+   "Copy all notes to clipboard" is the way to get them out for review. */
 (function () {
   const C = window.Color, Assets = window.FlagAssets;
   const $ = id => document.getElementById(id);
@@ -10,8 +11,8 @@
   function loadStatus() {
     try {
       const v = JSON.parse(localStorage.getItem(STORE_KEY));
-      return v && v.fine ? v : { fine: {}, index: 0 };
-    } catch (e) { return { fine: {}, index: 0 }; }
+      return v && v.fine ? Object.assign({ fine: {}, notes: {}, index: 0 }, v) : { fine: {}, notes: {}, index: 0 };
+    } catch (e) { return { fine: {}, notes: {}, index: 0 }; }
   }
   function saveStatus() { try { localStorage.setItem(STORE_KEY, JSON.stringify(status)); } catch (e) { /* private mode */ } }
 
@@ -73,6 +74,10 @@
     $('btn-clear').addEventListener('click', () => { board.clear(); updateProgress(); $('fc-score').hidden = true; });
     $('btn-score').addEventListener('click', showScore);
     $('fc-reset').addEventListener('click', resetProgress);
+    $('fc-copy-notes').addEventListener('click', copyAllNotes);
+    $('fc-notes-input').addEventListener('input', onNoteInput);
+    // belt-and-braces: flush the note if the tab is closed/hidden mid-debounce
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flushNote(); });
 
     await load(idx);
   }
@@ -81,19 +86,27 @@
 
   function buildSelect() {
     const sel = $('fc-select');
-    sel.innerHTML = order.map((f, i) => `<option value="${i}">${status.fine[f.code] ? '✓ ' : ''}${f.name}</option>`).join('');
+    sel.innerHTML = order.map((f, i) => {
+      const mark = (status.fine[f.code] ? '✓' : '') + (status.notes[f.code] ? '✎' : '');
+      return `<option value="${i}">${mark ? mark + ' ' : ''}${f.name}</option>`;
+    }).join('');
     $('fc-fine-count').textContent = fineCount();
   }
 
   async function load(i) {
+    flushNote();
     idx = i; status.index = i; saveStatus();
     const meta = order[idx];
     $('fc-country').textContent = meta.name.toUpperCase();
     $('fc-progress').textContent = `${idx + 1} / ${order.length}`;
     $('fc-select').value = idx;
+    $('fc-truth-img').src = `flags/${meta.code}.svg`;
+    $('fc-truth-img').alt = `${meta.name} flag`;
     const done = !!status.fine[meta.code];
     $('fc-fine').classList.toggle('is-done', done);
     $('fc-fine').textContent = done ? '✓ Marked fine' : '✓ Flag is fine';
+    $('fc-notes-input').value = status.notes[meta.code] || '';
+    $('fc-notes-status').textContent = '';
     $('prefill-note').hidden = !(meta.prefilled > 0);
     $('fc-score').hidden = true;
     $('flag-loading').hidden = false;
@@ -135,11 +148,52 @@
   }
 
   function resetProgress() {
-    if (!confirm('Clear every "flag is fine" mark on this device and start the review over?')) return;
-    status = { fine: {}, index: 0 };
+    if (!confirm('Clear every "flag is fine" mark on this device and start the review over? (Your notes are kept.)')) return;
+    status = { fine: {}, notes: status.notes, index: 0 };
     saveStatus();
     buildSelect();
     load(0);
+  }
+
+  // ----------------------------------------------------------------- notes
+  // Autosaved to localStorage as you type (debounced), so there's no explicit
+  // save step - just write and move on. flushNote() forces it through
+  // immediately when navigating away or hiding the tab, so nothing typed in
+  // the last moment before that is lost.
+  let noteTimer = null;
+  function onNoteInput(e) {
+    status.notes[order[idx].code] = e.target.value;
+    $('fc-notes-status').textContent = 'Saving…';
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(commitNote, 500);
+  }
+  function commitNote() {
+    noteTimer = null;
+    const code = order[idx].code;
+    if (!status.notes[code]) delete status.notes[code];
+    saveStatus();
+    buildSelect();
+    $('fc-select').value = idx;
+    $('fc-notes-status').textContent = 'Saved';
+  }
+  function flushNote() { if (noteTimer) { clearTimeout(noteTimer); commitNote(); } }
+
+  async function copyAllNotes() {
+    flushNote();
+    const lines = [`FlagFill notes - exported ${new Date().toISOString()}`, ''];
+    let count = 0;
+    for (const f of order) {
+      const note = (status.notes[f.code] || '').trim();
+      if (!note) continue;
+      count++;
+      lines.push(`[${f.code}] ${f.name}${status.fine[f.code] ? ' (marked fine)' : ''}`, note, '');
+    }
+    if (!count) lines.push('(no notes written yet)');
+    const text = lines.join('\n');
+    const btn = $('fc-copy-notes');
+    try { await navigator.clipboard.writeText(text); btn.textContent = count ? `Copied ${count} note${count === 1 ? '' : 's'}!` : 'No notes yet'; }
+    catch (e) { prompt('Copy your notes:', text); }
+    setTimeout(() => { btn.textContent = 'Copy all notes to clipboard'; }, 2200);
   }
 
   init().catch(err => { console.error(err); alert('Failed to load: ' + err.message); });
