@@ -16,7 +16,8 @@
   function saveStatus() { try { localStorage.setItem(STORE_KEY, JSON.stringify(status)); } catch (e) { /* private mode */ } }
 
   // Same scoring rule as the real game (js/game.js) - duplicated rather than
-  // shared so this tool never depends on game.js's screen-wiring init().
+  // shared so this tool never depends on game.js's screen-wiring init(). Keep
+  // this in sync with game.js's scoreAttempt if that one changes.
   function scoreAttempt(meta, fills) {
     const groups = new Map();
     for (const r of meta.regions) {
@@ -24,19 +25,32 @@
       groups.get(r.hex).regions.push(r);
     }
     const out = [];
+    const rows = [];
     for (const g of groups.values()) {
-      let totalArea = 0, weighted = 0, best = null;
+      let totalArea = 0, weighted = 0;
+      const byFill = new Map();
       for (const r of g.regions) {
         const yours = fills.get(r.id) || '#f4f4f1';
         const pts = C.pointsFor(C.hexDistance(yours, g.hex));
         weighted += pts * r.area; totalArea += r.area;
-        if (!best || r.area > best.area) best = { area: r.area, hex: yours };
+        if (!byFill.has(yours)) byFill.set(yours, { yours, points: pts, area: 0, count: 0 });
+        const fillGroup = byFill.get(yours);
+        fillGroup.area += r.area; fillGroup.count += 1;
       }
-      out.push({ hex: g.hex, yours: best.hex, points: Math.round(weighted / totalArea), verdict: C.verdict(Math.round(weighted / totalArea)) });
+      const points = Math.round(weighted / totalArea);
+      out.push({ hex: g.hex, points, area: totalArea });
+      // One row per distinct fill used within this colour, so a wrongly-coloured
+      // region shows up on its own instead of being averaged into the rest.
+      for (const fillGroup of [...byFill.values()].sort((a, b) => b.area - a.area)) {
+        rows.push({
+          hex: g.hex, yours: fillGroup.yours, points: fillGroup.points,
+          verdict: C.verdict(fillGroup.points), count: fillGroup.count, groupArea: totalArea, area: fillGroup.area,
+        });
+      }
     }
-    out.sort((a, b) => b.points - a.points);
+    rows.sort((a, b) => b.groupArea - a.groupArea || b.area - a.area);
     const points = Math.round(out.reduce((s, g) => s + g.points, 0) / out.length);
-    return { points, groups: out };
+    return { points, rows };
   }
 
   let manifest, order, status, idx, board, picker;
@@ -101,14 +115,14 @@
     const meta = order[idx], result = scoreAttempt(meta, board.fills);
     const el = $('fc-score');
     el.hidden = false;
-    el.innerHTML = `<div class="fc-score-total">${result.points} <small>/ 1000</small></div>` + result.groups.map(g => `
+    el.innerHTML = `<div class="fc-score-total">${result.points} <small>/ 1000</small></div>` + result.rows.map(g => `
       <div class="bd-row">
         <div class="bd-swatches">
           <span class="sw" style="background:${g.yours}" title="Yours ${g.yours}"></span>
           <span class="sw-arrow">→</span>
           <span class="sw" style="background:${g.hex}" title="Actual ${g.hex}"></span>
         </div>
-        <div class="bd-name">${C.describe(g.hex)}<small>${g.yours.toUpperCase()} vs ${g.hex.toUpperCase()}</small></div>
+        <div class="bd-name">${C.describe(g.hex)}${g.count > 1 ? ` <small>(×${g.count} regions)</small>` : ''}<small>${g.yours.toUpperCase()} vs ${g.hex.toUpperCase()}</small></div>
         <div class="bd-verdict v-${g.verdict.replace(/\s/g, '').toLowerCase()}">${g.verdict}</div>
       </div>`).join('');
   }
