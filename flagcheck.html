@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FlagFill — flag check</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* flagcheck-only layout - a dev tool page, not linked from the game itself */
+    body { background: var(--bg); }
+    .fc-controls {
+      max-width: 1180px; margin: 0 auto; padding: 0 20px; display: flex; flex-wrap: wrap;
+      align-items: center; justify-content: space-between; gap: 12px 20px;
+    }
+    .fc-jump { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 600 13px var(--body); }
+    .fc-jump select {
+      font: 600 14px var(--body); color: var(--text); background: var(--panel); border: 1px solid var(--line);
+      border-radius: 10px; padding: 9px 12px; max-width: 46vw;
+    }
+    .fc-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .fc-buttons .btn { padding: 12px 20px; }
+    #fc-fine.is-done { background: linear-gradient(135deg, #2ee6c5, #1fb894); color: #06231d; box-shadow: 0 8px 24px rgba(46, 230, 197, .3); }
+    .fc-score { margin-top: 16px; }
+    .fc-score-total { font: 800 34px var(--display); text-align: center; margin-bottom: 10px; }
+    .fc-footer { text-align: center; padding: 10px 20px 40px; }
+    @media (max-width: 720px) {
+      .fc-jump select { max-width: 60vw; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="screen active" id="screen-check">
+    <header class="topbar">
+      <div class="round-label">Flag check · <span id="fc-progress">1 / 1</span></div>
+      <div class="score-chip"><span class="score-chip-label">Marked fine</span><span id="fc-fine-count">0</span></div>
+    </header>
+
+    <div class="fc-controls">
+      <label class="fc-jump">Jump to <select id="fc-select"></select></label>
+      <div class="fc-buttons">
+        <button class="btn ghost" id="fc-skip">Skip ›</button>
+        <button class="btn primary" id="fc-fine">✓ Flag is fine</button>
+      </div>
+    </div>
+
+    <div class="play-grid">
+      <div class="flag-col">
+        <h2 class="country-name" id="fc-country">COUNTRY</h2>
+        <div class="flag-frame">
+          <canvas id="flag-canvas" width="800" height="600" aria-label="Flag to colour in"></canvas>
+          <div class="flag-loading" id="flag-loading"><div class="spinner"></div></div>
+        </div>
+        <p class="prefill-note" id="prefill-note" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2zm0-8h-2V7h2z"/></svg>
+          Some fine details of this flag have been filled in for you.
+        </p>
+        <div class="progress-row">
+          <div class="progress-text" id="progress-text">0 of 0 regions filled</div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+      </div>
+
+      <aside class="tools-col">
+        <div class="tools-head">
+          <div class="tool-label">Fill colour</div>
+          <span class="hint">Pick a colour, then click a region</span>
+        </div>
+        <div id="picker"></div>
+        <div class="tool-actions">
+          <button class="btn ghost" id="btn-clear">Clear all</button>
+          <button class="btn primary" id="btn-score">Score it</button>
+        </div>
+        <div class="breakdown fc-score" id="fc-score" hidden></div>
+      </aside>
+    </div>
+
+    <div class="fc-footer">
+      <button class="link-btn" id="fc-reset">Reset all "fine" marks</button>
+    </div>
+  </section>
+
+  <script src="js/color.js"></script>
+  <script src="js/picker.js"></script>
+  <script src="js/flagboard.js"></script>
+  <script src="js/flagcheck.js"></script>
+</body>
+</html>

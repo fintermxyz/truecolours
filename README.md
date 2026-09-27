@@ -22,6 +22,8 @@ js/color.js         colour maths: HSV/RGB/Lab conversions, CIEDE2000, points cur
 js/picker.js        the colour picker component
 js/flagboard.js     loads a flag's region map and draws / fills the canvas
 js/game.js          screens, modes, scoring, daily challenge, share, analytics events
+flagcheck.html      dev tool: play every flag in the catalogue one after another
+js/flagcheck.js     logic for flagcheck.html (see "Checking every flag" below)
 flags/              one .svg + one .bin (region map) per country, plus manifest.json
 api/daily.js        Vercel serverless function (daily scores, Upstash Redis)
 tools/build_flags.py   regenerates flags/ from the flag-icons SVG set
@@ -133,6 +135,25 @@ re-shuffles the daily order, so do that between days rather than mid-day.
 The daily flag is chosen by a fixed seeded shuffle of the catalogue, indexed by the
 number of days since `CONFIG.dailyEpoch` in `js/game.js` (Daily #1 = 1 Sep 2026). It
 therefore needs no server and everyone's browser agrees on the flag.
+
+## Checking every flag
+
+`flagcheck.html` is a dev tool for playtesting the whole catalogue by hand - not a
+game mode, not linked from `index.html`, just a page you open directly (locally or on
+the deployed site) when you want to click through every flag and eyeball its regions.
+It plays exactly like a normal round (pick a colour, click a region, "Score it" for a
+breakdown) plus:
+
+* a counter and a "Jump to" dropdown of every flag, so you can go through in order or
+  drop straight to one;
+* **Skip** - move to the next flag without recording anything;
+* **Flag is fine** - marks the current flag done and moves to the next. Marked flags
+  get a ✓ in the dropdown and count towards "Marked fine" in the header.
+
+The fine-marks are kept in that browser's `localStorage` only (nothing is sent
+anywhere) - "Reset all fine marks" at the bottom clears them and starts the pass over.
+Since it's a plain page with no auth, don't rely on it being private if the URL leaks;
+there's nothing sensitive on it, just play-testing state.
 
 ## Outlines
 
