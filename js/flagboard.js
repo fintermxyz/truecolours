@@ -170,7 +170,13 @@
         if (ed === 1) c = fill ? [fill[0] * SEAM_DARKEN, fill[1] * SEAM_DARKEN, fill[2] * SEAM_DARKEN] : SEAM_INK;
         else if (ed === 2 && !fill) c = DETAIL_INK;
         else c = fill || ((((x >> 3) + (y >> 3)) & 1) ? PAPER_A : PAPER_B);
-        if (L === hover) { out[o] = c[0] * 0.8 + 51; out[o + 1] = c[1] * 0.8 + 51; out[o + 2] = c[2] * 0.8 + 51; }
+        if (L === hover) {
+          // Push brightness away from the fill's own luminance so the highlight
+          // reads clearly whether the region is dark or already near-white.
+          const lum = c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114;
+          if (lum > 140) { out[o] = c[0] * 0.75; out[o + 1] = c[1] * 0.75; out[o + 2] = c[2] * 0.75; }
+          else { out[o] = c[0] * 0.6 + 102; out[o + 1] = c[1] * 0.6 + 102; out[o + 2] = c[2] * 0.6 + 102; }
+        }
         else { out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; }
         out[o + 3] = 255;
       }
