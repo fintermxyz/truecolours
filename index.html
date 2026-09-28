@@ -16,13 +16,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
-  <!-- Google Analytics (GA4). Swap the ID below if you create a new data stream for this site. -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SR1N5CH6R0"></script>
+  <!-- Google Analytics (GA4). Set your own Measurement ID to enable; with the
+       placeholder left in place, no analytics loads and no events are sent. -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-SR1N5CH6R0');
+    (function () {
+      const GA_ID = 'G-XXXXXXXXXX';
+      if (GA_ID === 'G-XXXXXXXXXX') return;
+      const s = document.createElement('script');
+      s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+      document.head.appendChild(s);
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { dataLayer.push(arguments); };
+      gtag('js', new Date());
+      gtag('config', GA_ID);
+    })();
   </script>
 </head>
 <body>
@@ -70,8 +77,16 @@
           <span class="mode-title">5 random flags</span>
           <span class="mode-desc">Five rounds, five countries, no repeats. Score up to 5,000 points.</span>
         </button>
+        <button class="mode-card versus" id="btn-match">
+          <span class="mode-kicker" id="match-kicker">Challenge</span>
+          <span class="mode-title" id="match-title">Play with your viewers</span>
+          <span class="mode-desc" id="match-desc">Make a match link and drop it in chat — everyone colours the same 5 flags. Compare scores.</span>
+        </button>
       </div>
-      <button class="link-btn" id="btn-how">How does scoring work?</button>
+      <div class="home-links">
+        <button class="link-btn" id="btn-how">How does scoring work?</button>
+        <button class="link-btn" id="btn-streamer" aria-pressed="false">Streamer mode: off</button>
+      </div>
       <p class="credits">Flags from <a href="https://github.com/lipis/flag-icons" target="_blank" rel="noopener">flag-icons</a> (MIT). Globe from <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain). Colours judged with CIEDE2000.</p>
     </div>
   </section>
@@ -83,7 +98,10 @@
         <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
       </button>
       <div class="round-label" id="round-label">Round 1 of 5</div>
-      <div class="score-chip" id="score-chip"><span class="score-chip-label">Total</span><span id="score-total">0</span></div>
+      <div class="topbar-right">
+        <div class="timer-chip" id="timer-chip" hidden><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0-2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm1 5h-2v6l4.7 2.8 1-1.6-3.7-2.2z"/></svg><span id="timer-secs">60</span></div>
+        <div class="score-chip" id="score-chip"><span class="score-chip-label">Total</span><span id="score-total">0</span></div>
+      </div>
     </header>
 
     <div class="play-grid">
@@ -143,20 +161,17 @@
     </div>
   </section>
 
-  <!-- ================= FINAL (quick play) ================= -->
+  <!-- ================= FINAL (quick play / match) ================= -->
   <section id="screen-final" class="screen">
     <div class="result-wrap">
-      <span class="kicker">Quick Play complete</span>
+      <span class="kicker" id="final-kicker">Quick Play complete</span>
       <h2 class="final-title">Final score</h2>
       <div class="result-score">
         <div class="big-score"><span id="final-points">0</span><span class="of">/5000</span></div>
         <div class="verdict" id="final-verdict"></div>
       </div>
       <div class="rounds-list" id="rounds-list"></div>
-      <div class="result-actions">
-        <button class="btn primary" id="btn-again">Play again</button>
-        <button class="btn ghost" id="btn-final-home">Menu</button>
-      </div>
+      <div class="result-actions" id="final-actions"></div>
     </div>
   </section>
 
@@ -169,6 +184,32 @@
       <p>Each colour in the real flag is worth an equal share of <b>1,000 points</b>. Your colour is compared with the real one using CIEDE2000, a measure of how different two colours <em>look</em> to a human eye — not just how far apart the numbers are. A difference you couldn't spot still scores 1,000; the further off you are, the faster the points fall away.</p>
       <p>Very small details (fine emblems, tiny stars, lettering) are pre-filled for you so you can focus on the big blocks of colour.</p>
       <p><b>Daily Challenge</b>: everyone in the world gets the same flag each day (resets at midnight UTC). One attempt only, so make it count — then share your score.</p>
+      <p><b>Challenge</b>: make a match link and share it. Everyone who opens the link gets the same five flags, so a streamer and their chat can play the exact same game and compare scores. An optional per-flag timer keeps everyone honest.</p>
+    </div>
+  </div>
+
+  <!-- ================= CREATE MATCH ================= -->
+  <div class="modal" id="modal-match" hidden>
+    <div class="modal-card">
+      <button class="icon-btn modal-close" id="btn-match-close" aria-label="Close">✕</button>
+      <h3>Challenge your viewers</h3>
+      <p>Everyone who opens this link plays the <b>same 5 flags</b> in the same order. Copy it into your chat, then start when you're ready.</p>
+      <div class="match-opt">
+        <span class="match-opt-label">Time per flag</span>
+        <div class="seg" id="match-timer-seg" role="group" aria-label="Time per flag">
+          <button type="button" data-t="0" class="on">None</button>
+          <button type="button" data-t="30">30s</button>
+          <button type="button" data-t="60">60s</button>
+          <button type="button" data-t="90">90s</button>
+        </div>
+      </div>
+      <div class="match-link-row">
+        <input id="match-link" class="match-link" readonly aria-label="Match link">
+        <button class="btn ghost" id="btn-match-copy">Copy</button>
+      </div>
+      <div class="result-actions">
+        <button class="btn primary" id="btn-match-start">Start match</button>
+      </div>
     </div>
   </div>
 

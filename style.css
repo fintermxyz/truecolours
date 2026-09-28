@@ -75,7 +75,7 @@ h1, h2, h3, .country-name, .big-score, .mode-title { font-family: var(--display)
 h1 { font-size: clamp(48px, 9vw, 92px); line-height: .9; margin: 0; letter-spacing: -.02em; font-weight: 800; text-align: left; }
 .tagline { color: var(--muted); font-size: clamp(15px, 2vw, 18px); line-height: 1.5; margin: 26px 0 36px; }
 .tagline em { color: var(--gold); font-style: normal; }
-.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; width: 100%; }
+.mode-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; width: 100%; }
 .mode-card {
   text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px 26px 28px; cursor: pointer;
   background: linear-gradient(160deg, var(--panel), var(--bg-2)); color: var(--text); display: flex; flex-direction: column; gap: 8px;
@@ -84,10 +84,13 @@ h1 { font-size: clamp(48px, 9vw, 92px); line-height: .9; margin: 0; letter-spaci
 .mode-card::after { content: ""; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; filter: blur(30px); opacity: .5; }
 .mode-card.daily::after { background: var(--gold); }
 .mode-card.quick::after { background: var(--teal); }
+.mode-card.versus::after { background: var(--coral); }
 .mode-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.2); box-shadow: var(--shadow); }
 .mode-kicker { font: 700 12px var(--body); letter-spacing: .14em; text-transform: uppercase; }
 .daily .mode-kicker { color: var(--gold); }
 .quick .mode-kicker { color: var(--teal); }
+.versus .mode-kicker { color: var(--coral-2); }
+.home-links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
 .mode-title { font-size: 30px; font-weight: 800; line-height: 1.05; }
 .mode-desc { color: var(--muted); font-size: 14px; line-height: 1.5; }
 .credits { color: var(--muted); font-size: 12px; margin-top: 40px; opacity: .8; }
@@ -96,6 +99,10 @@ h1 { font-size: clamp(48px, 9vw, 92px); line-height: .9; margin: 0; letter-spaci
 /* ---------------------------------------------------------------- play */
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; max-width: 1180px; margin: 0 auto; }
 .round-label { font: 700 13px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.timer-chip { display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font: 800 18px var(--display); color: var(--teal); font-variant-numeric: tabular-nums; }
+.timer-chip.low { color: #fff; background: linear-gradient(135deg, var(--coral), #ff4f8b); border-color: transparent; animation: timerpulse .8s ease infinite; }
+@keyframes timerpulse { 50% { transform: scale(1.07); } }
 .score-chip { display: flex; align-items: baseline; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; }
 .score-chip-label { font: 700 11px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 #score-total { font: 800 20px var(--display); color: var(--gold); }
@@ -194,7 +201,43 @@ h1 { font-size: clamp(48px, 9vw, 92px); line-height: .9; margin: 0; letter-spaci
 .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); background: var(--teal); color: #05261f; font-weight: 700; padding: 12px 20px; border-radius: 999px; opacity: 0; transition: all .25s; z-index: 60; box-shadow: var(--shadow); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---------------------------------------------------------------- match modal */
+.match-opt { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 18px 0 14px; flex-wrap: wrap; }
+.match-opt-label { font: 700 12px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: none; color: var(--muted); font: 700 13px var(--body); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+.seg button.on { background: var(--panel-2); color: var(--text); }
+.seg button:hover:not(.on) { color: var(--text); }
+.match-link-row { display: flex; gap: 10px; margin-bottom: 6px; }
+.match-link { flex: 1; min-width: 0; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: 600 13px/1 ui-monospace, Menlo, monospace; padding: 14px 14px; outline: none; }
+.match-link:focus { border-color: var(--teal); }
+.match-link-row .btn { padding: 14px 20px; }
+#modal-match .result-actions { margin-top: 16px; }
+
+/* ---------------------------------------------------------------- streamer mode
+   Bigger, higher-contrast type on the play and result screens so the game
+   reads clearly on a compressed 1080p stream capture. */
+body.streamer .country-name { font-size: clamp(34px, 5vw, 60px); }
+body.streamer .round-label { font-size: 16px; color: var(--text); }
+body.streamer .timer-chip { font-size: 26px; padding: 10px 20px; }
+body.streamer #score-total { font-size: 26px; }
+body.streamer .progress-text, body.streamer .hint, body.streamer .prefill-note { font-size: 16px; }
+body.streamer .tool-label { font-size: 15px; }
+body.streamer .pk-chip { width: 40px; height: 40px; }
+body.streamer .pk-hex { font-size: 18px; }
+body.streamer .breakdown, body.streamer .rounds-list { font-size: 17px; }
+body.streamer .bd-name small { font-size: 13px; }
+body.streamer .bd-points { font-size: 26px; }
+body.streamer .rl-pts { font-size: 22px; }
+body.streamer .verdict { font-size: 18px; }
+body.streamer .kicker { font-size: 15px; }
+body.streamer .ds-label { font-size: 14px; }
+
 /* ---------------------------------------------------------------- responsive */
+@media (max-width: 1000px) {
+  .mode-cards { grid-template-columns: 1fr 1fr; }
+  .mode-card.versus { grid-column: 1 / -1; }
+}
 @media (max-width: 860px) {
   .play-grid { grid-template-columns: 1fr; gap: 18px; }
   .tools-col { position: static; }

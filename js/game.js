@@ -31,6 +31,19 @@
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
+  // Match codes: short, unambiguous (no 0/O/1/I/L), turned into a shuffle seed
+  // by hashing - so a code alone determines the five flags, no server involved.
+  const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  function newMatchCode() {
+    let s = '';
+    for (let i = 0; i < 5; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return s;
+  }
+  function hashSeed(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
   function utcDateKey(d = new Date()) { return d.toISOString().slice(0, 10); }
   function dayNumber(d = new Date()) {
     const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -107,8 +120,11 @@
   }
 
   // ----------------------------------------------------------------- state
-  const state = { mode: null, round: 0, flags: [], results: [], total: 0, meta: null };
+  const state = { mode: null, round: 0, flags: [], results: [], total: 0, meta: null,
+                  matchCode: null, matchTimer: 0 };
   let manifest, board, picker, dailyOrder;
+  let joinMatch = null;          // {code, timer} when arriving via a ?match= link
+  let pendingMatch = null;       // the match being set up in the create-match modal
 
   // ----------------------------------------------------------------- boot
   async function init() {
@@ -123,22 +139,48 @@
 
     $('btn-daily').addEventListener('click', startDaily);
     $('btn-quick').addEventListener('click', startQuick);
+    $('btn-match').addEventListener('click', () => {
+      if (joinMatch) startMatch(joinMatch.code, joinMatch.timer);
+      else openMatchModal();
+    });
     $('btn-home').addEventListener('click', goHome);
-    $('btn-final-home').addEventListener('click', goHome);
-    $('btn-again').addEventListener('click', startQuick);
     $('btn-clear').addEventListener('click', () => { board.clear(); updateProgress(); });
-    $('btn-submit').addEventListener('click', submit);
+    $('btn-submit').addEventListener('click', () => submit());
     $('btn-how').addEventListener('click', () => $('modal-how').hidden = false);
     $('btn-how-close').addEventListener('click', () => $('modal-how').hidden = true);
     $('modal-how').addEventListener('click', e => { if (e.target.id === 'modal-how') e.target.hidden = true; });
+    $('btn-streamer').addEventListener('click', () => setStreamerMode(!store.get('streamer', false)));
+    bindMatchModal();
+
+    const params = new URLSearchParams(location.search);
+    if (params.has('streamer') || store.get('streamer', false)) setStreamerMode(true);
+    const matchCode = (params.get('match') || '').toUpperCase().replace(/[^2-9A-Z]/g, '');
+    if (matchCode) {
+      joinMatch = { code: matchCode, timer: clampTimer(params.get('t')) };
+      refreshMatchCard();
+    }
 
     refreshDailyCard();
-    if (new URLSearchParams(location.search).has('daily')) startDaily();
+    if (params.has('daily')) startDaily();
   }
 
   function goHome() {
-    state.mode = null; refreshDailyCard(); show('screen-home');
-    history.replaceState(null, '', location.pathname);
+    state.mode = null; stopTimer(); refreshDailyCard(); refreshMatchCard(); show('screen-home');
+    // Keep a joined match's link params so the "Join match" card still works from home.
+    history.replaceState(null, '', joinMatch
+      ? location.pathname + '?match=' + joinMatch.code + (joinMatch.timer ? '&t=' + joinMatch.timer : '')
+      : location.pathname);
+  }
+
+  // ----------------------------------------------------------------- streamer mode
+  // Bigger type on the play/result screens so the game reads clearly on a
+  // stream capture. Persisted; ?streamer in the URL switches it on too.
+  function setStreamerMode(on) {
+    store.set('streamer', !!on);
+    document.body.classList.toggle('streamer', !!on);
+    const b = $('btn-streamer');
+    b.textContent = 'Streamer mode: ' + (on ? 'on' : 'off');
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 
   // ----------------------------------------------------------------- home logo (decorative only, unrelated to the daily challenge)
@@ -189,12 +231,98 @@
     beginRound();
   }
 
+  // ----------------------------------------------------------------- matches
+  // A match is a seeded Quick Play: the code alone determines the five flags,
+  // so everyone who opens the link plays the same game - no server needed.
+  function clampTimer(t) {
+    t = parseInt(t, 10);
+    return [30, 60, 90].includes(t) ? t : 0;
+  }
+  function matchFlags(code) {
+    const sorted = manifest.flags.slice().sort((a, b) => a.code.localeCompare(b.code));
+    return seededShuffle(sorted, hashSeed('match:' + code)).slice(0, CONFIG.rounds);
+  }
+  function matchUrl(code, timer) {
+    return location.origin + location.pathname + '?match=' + code + (timer ? '&t=' + timer : '');
+  }
+  function refreshMatchCard() {
+    if (joinMatch) {
+      $('match-kicker').textContent = 'Challenge · Match ' + joinMatch.code;
+      $('match-title').textContent = 'Join the match';
+      $('match-desc').textContent = 'You\'ve been challenged! Five flags, the same for everyone with this link'
+        + (joinMatch.timer ? `, ${joinMatch.timer} seconds per flag` : '') + '. Ready?';
+    } else {
+      $('match-kicker').textContent = 'Challenge';
+      $('match-title').textContent = 'Play with your viewers';
+      $('match-desc').textContent = 'Make a match link and drop it in chat — everyone colours the same 5 flags. Compare scores.';
+    }
+  }
+  function bindMatchModal() {
+    const modal = $('modal-match');
+    $('btn-match-close').addEventListener('click', () => modal.hidden = true);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
+    $('match-timer-seg').addEventListener('click', e => {
+      const b = e.target.closest('button[data-t]');
+      if (!b || !pendingMatch) return;
+      pendingMatch.timer = clampTimer(b.dataset.t);
+      [...$('match-timer-seg').children].forEach(x => x.classList.toggle('on', x === b));
+      $('match-link').value = matchUrl(pendingMatch.code, pendingMatch.timer);
+    });
+    $('btn-match-copy').addEventListener('click', async () => {
+      const link = $('match-link').value;
+      try { await navigator.clipboard.writeText(link); toast('Match link copied — paste it in chat'); }
+      catch (e) { $('match-link').select(); document.execCommand('copy'); toast('Match link copied'); }
+    });
+    $('btn-match-start').addEventListener('click', () => {
+      modal.hidden = true;
+      startMatch(pendingMatch.code, pendingMatch.timer);
+    });
+  }
+  function openMatchModal() {
+    pendingMatch = { code: newMatchCode(), timer: 0 };
+    [...$('match-timer-seg').children].forEach(b => b.classList.toggle('on', b.dataset.t === '0'));
+    $('match-link').value = matchUrl(pendingMatch.code, 0);
+    $('modal-match').hidden = false;
+  }
+  function startMatch(code, timer) {
+    state.mode = 'match'; state.round = 0; state.flags = matchFlags(code);
+    state.results = []; state.total = 0; state.matchCode = code; state.matchTimer = timer || 0;
+    history.replaceState(null, '', matchUrl(code, timer).slice(location.origin.length));
+    track('start_match', { match_code: code, timer: timer || 0 });
+    beginRound();
+  }
+
+  // ----------------------------------------------------------------- round timer
+  let timerHandle = null, timerEndsAt = 0;
+  function startTimer(secs) {
+    stopTimer();
+    const chip = $('timer-chip');
+    chip.hidden = false; chip.classList.remove('low');
+    timerEndsAt = Date.now() + secs * 1000;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000));
+      $('timer-secs').textContent = left;
+      chip.classList.toggle('low', left <= 10);
+      if (left <= 0) { stopTimer(); toast('Time! Scoring what you\'ve got…'); submit(true); }
+    };
+    tick();
+    timerHandle = setInterval(tick, 250);
+  }
+  function stopTimer() {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = null;
+    $('timer-chip').hidden = true;
+  }
+
   async function beginRound() {
     const meta = state.flags[state.round]; state.meta = meta;
+    stopTimer();
     show('screen-play');
     $('country-name').textContent = meta.name.toUpperCase();
-    $('round-label').textContent = state.mode === 'daily' ? `Daily #${state.daily.number}` : `Round ${state.round + 1} of ${CONFIG.rounds}`;
-    $('score-chip').hidden = state.mode !== 'quick';
+    $('round-label').textContent = state.mode === 'daily' ? `Daily #${state.daily.number}`
+      : state.mode === 'match' ? `Match ${state.matchCode} · Round ${state.round + 1} of ${CONFIG.rounds}`
+      : `Round ${state.round + 1} of ${CONFIG.rounds}`;
+    $('score-chip').hidden = state.mode === 'daily';
     $('score-total').textContent = fmt(state.total);
     $('prefill-note').hidden = !(meta.prefilled > 0);
     $('flag-loading').hidden = false;
@@ -204,6 +332,8 @@
     board.interactive = true;
     $('flag-loading').hidden = true;
     updateProgress();
+    // The clock only starts once the flag is actually on screen.
+    if (state.mode === 'match' && state.matchTimer) startTimer(state.matchTimer);
   }
 
   function updateProgress() {
@@ -213,8 +343,9 @@
     $('btn-submit').disabled = f < n;
   }
 
-  async function submit() {
-    if (board.filledCount < state.meta.regions.length) return;
+  async function submit(force) {
+    if (!force && board.filledCount < state.meta.regions.length) return;
+    stopTimer();
     const meta = state.meta, fills = new Map(board.fills);
     const result = scoreAttempt(meta, fills);
     state.results.push({ meta, result, fills });
@@ -237,7 +368,9 @@
   // ----------------------------------------------------------------- results
   async function showResult(meta, fills, result, stats, isDaily) {
     show('screen-result');
-    $('result-kicker').textContent = isDaily ? `Daily Challenge #${state.daily.number}` : `Round ${state.round + 1} of ${CONFIG.rounds}`;
+    $('result-kicker').textContent = isDaily ? `Daily Challenge #${state.daily.number}`
+      : state.mode === 'match' ? `Match ${state.matchCode} · Round ${state.round + 1} of ${CONFIG.rounds}`
+      : `Round ${state.round + 1} of ${CONFIG.rounds}`;
     $('result-country').textContent = meta.name.toUpperCase();
     $('result-verdict').textContent = C.verdict(result.points);
     animateNumber($('result-points'), result.points);
@@ -288,12 +421,40 @@
 
   function showFinal() {
     show('screen-final');
+    const isMatch = state.mode === 'match';
     const max = CONFIG.rounds * 1000;
+    $('final-kicker').textContent = isMatch ? `Match ${state.matchCode} complete` : 'Quick Play complete';
     animateNumber($('final-points'), state.total);
     $('final-verdict').textContent = `${overallVerdict(state.total, max)} · ${Math.round(state.total / max * 100)}% accuracy`;
     $('rounds-list').innerHTML = state.results.map((r, i) => `
       <div class="rl-row"><span class="rl-n">${i + 1}</span><span class="rl-name">${r.meta.name}</span><span class="rl-bar"><i style="width:${r.result.points / 10}%"></i></span><span class="rl-pts">${r.result.points}</span></div>`).join('');
-    track('quick_complete', { score: state.total });
+    const actions = $('final-actions');
+    if (isMatch) {
+      actions.innerHTML = `<button class="btn primary" id="btn-match-share">Share score</button><button class="btn ghost" id="btn-match-relink">Copy match link</button><button class="btn ghost" id="btn-final-home">Menu</button>`;
+      $('btn-match-share').addEventListener('click', shareMatch);
+      $('btn-match-relink').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(matchUrl(state.matchCode, state.matchTimer)); toast('Match link copied — paste it in chat'); }
+        catch (e) { prompt('Copy the match link:', matchUrl(state.matchCode, state.matchTimer)); }
+      });
+      if (joinMatch && joinMatch.code === state.matchCode) { joinMatch = null; refreshMatchCard(); }
+    } else {
+      actions.innerHTML = `<button class="btn primary" id="btn-again">Play again</button><button class="btn ghost" id="btn-final-home">Menu</button>`;
+      $('btn-again').addEventListener('click', startQuick);
+    }
+    $('btn-final-home').addEventListener('click', goHome);
+    track(isMatch ? 'match_complete' : 'quick_complete', { score: state.total });
+  }
+
+  async function shareMatch() {
+    const url = matchUrl(state.matchCode, state.matchTimer);
+    const lines = state.results.map(r => `${emojiBar(r.result.groups)} ${r.meta.name} ${r.result.points}`);
+    const text = `${CONFIG.siteName} · Match ${state.matchCode}\nMy score: ${fmt(state.total)}/${fmt(CONFIG.rounds * 1000)}\n${lines.join('\n')}\nPlay the same flags: ${url}`;
+    track('share', { match_code: state.matchCode });
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(text); toast('Copied to clipboard — paste it anywhere'); }
+    catch (e) { prompt('Copy your result:', text); }
   }
 
   function animateNumber(el, target) {

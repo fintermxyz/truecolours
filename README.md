@@ -9,6 +9,9 @@ how close each of your colours is to the real thing.
   player. One attempt. Shows your score, the average, how many players you beat, and a
   share button.
 * **Quick Play** - five random flags, no repeats, up to 5,000 points.
+* **Challenge (matches)** - generate a match link and share it; everyone who opens it
+  plays the *same* five flags in the same order, with an optional 30/60/90-second
+  timer per flag. Built for streamers playing along with their chat.
 
 Everything is plain HTML/CSS/JS - no build step, no framework. It runs on Vercel with
 one serverless function for the daily-challenge stats.
@@ -68,14 +71,35 @@ counted once. Nothing personal is stored. The score itself is calculated in the 
 so a determined person could fake a score - fine for a friendly daily, but don't run a
 prize competition on it.
 
+## Streaming / playing with your audience
+
+Everything a streamer needs is client-side - no accounts, no extra server:
+
+* **Match links.** The *Challenge* card on the home screen generates a short match
+  code (e.g. `?match=9G3RY`). The code alone seeds which five flags come up, so every
+  browser that opens the link gets the identical game - drop the link in chat, count
+  down, play together, compare final scores. The final screen has "Share score"
+  (score + per-flag emoji breakdown + the match link) and "Copy match link" buttons.
+* **Per-flag timer.** When creating a match, pick 30/60/90 seconds per flag (carried
+  in the link as `&t=60`, so viewers get the same clock). The countdown starts once
+  the flag has actually loaded; when it hits zero the round is auto-scored with
+  whatever has been filled so far. Unfilled regions score as blank paper.
+* **Streamer mode.** The toggle on the home screen (or `?streamer` in the URL) bumps
+  up the type on the play and result screens - country name, timer, progress,
+  breakdown - so the game stays readable on a compressed 1080p stream capture. The
+  setting is remembered per browser.
+
+Match codes and results are never sent to the server; only the Daily Challenge talks
+to `/api/daily`.
+
 ## Google Analytics
 
-The GA4 snippet is in the `<head>` of `index.html` with Measurement ID `G-SR1N5CH6R0`
-(your existing property). If you'd rather keep this site's numbers separate, create a
-new data stream or property in GA and swap the ID in the two places it appears.
+`index.html` ships with a placeholder Measurement ID (`G-XXXXXXXXXX`); analytics is
+**disabled** until you put your own GA4 ID there. With the placeholder in place no GA
+script is loaded and no events are sent.
 
-Custom events sent: `start_daily`, `start_quick`, `round_complete`, `daily_complete`,
-`quick_complete`, `share`.
+Custom events sent (once enabled): `start_daily`, `start_quick`, `start_match`,
+`round_complete`, `daily_complete`, `quick_complete`, `match_complete`, `share`.
 
 ## How scoring works
 
